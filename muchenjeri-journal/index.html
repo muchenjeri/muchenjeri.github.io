@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muchenjeri Journal</title>
+<link rel="icon" href="logo-120.png">
+<style>
+  :root { --bg: #fbfaf6; --fg: #1f2420; --muted: #5b625c; --accent: #3b4a3f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161917; --fg: #e8ebe6; --muted: #a7afa8; --accent: #a3d0ae; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }
+  header { display: flex; align-items: center; gap: 16px; }
+  header img { width: 64px; height: 64px; border-radius: 14px; }
+  h1 { font-size: 1.8rem; margin: 0; }
+  p.tag { color: var(--muted); margin: 4px 0 0; }
+  h2 { font-size: 1.15rem; margin-top: 2em; color: var(--accent); }
+  a { color: var(--accent); }
+  footer { margin-top: 3em; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="logo-120.png" alt="">
+    <div>
+      <h1>Muchenjeri Journal</h1>
+      <p class="tag">A personal, offline-first journal for Android.</p>
+    </div>
+  </header>
+
+  <h2>What it is</h2>
+  <p>Muchenjeri Journal is a private journal app for a single person's own use. It is not a commercial product
+  and is not distributed on app stores. Entries, photos and voice notes are saved on the phone first, so the
+  journal works fully without an internet connection.</p>
+
+  <h2>Why it uses Google Drive</h2>
+  <p>If you connect a Google account, the app backs up the journal to a hidden app-data folder in
+  <em>your own</em> Google Drive, so it can be restored after reinstalling or on a new phone. The app requests only
+  the <code>drive.appdata</code> permission, which lets it see the folder it creates and nothing else in your Drive.</p>
+
+  <h2>Privacy</h2>
+  <p>There is no server, analytics, advertising or tracking. Journal content goes only to your phone and your own
+  Google Drive. Read the full <a href="privacy.html">privacy policy</a>.</p>
+
+  <footer>Muchenjeri Journal</footer>
+</main>
+</body>
+</html>
