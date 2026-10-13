@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Muchenjeri Journal</title>
+<meta name="description" content="A personal, offline-first journal that syncs with your own Google Drive.">
+<meta name="theme-color" content="#3b4a3f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+<script>
+  // Apply a saved theme choice before first paint.
+  try { const t = localStorage.getItem('mj-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header id="topbar">
+    <a class="brand" href="#/"><img src="icons/icon-192.png" alt=""><span>Muchenjeri Journal</span></a>
+    <nav id="tabs">
+      <a href="#/" data-tab="timeline"><span class="ico" data-icon="agenda"></span>Timeline</a>
+      <a href="#/calendar" data-tab="calendar"><span class="ico" data-icon="calendar"></span>Calendar</a>
+      <a href="#/search" data-tab="search"><span class="ico" data-icon="search"></span>Search</a>
+    </nav>
+    <div class="top-actions">
+      <button id="sync-status" class="status-btn" type="button"></button>
+      <a class="icon-btn" href="#/settings" title="Settings" aria-label="Settings"><span class="ico" data-icon="settings"></span></a>
+    </div>
+  </header>
+  <main id="view"><p class="empty">Loading…</p></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="empty">Muchenjeri Journal needs JavaScript.</p></noscript>
+</body>
+</html>
