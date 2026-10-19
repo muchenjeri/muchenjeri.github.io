@@ -1,10 +1,10 @@
 // Caches the app itself so the journal opens offline. Journal data lives in IndexedDB, not here,
 // and Google API requests are never cached. Bump VERSION whenever app files change.
-const VERSION = 'mj-v1';
+const VERSION = 'mj-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/archive.js', 'js/auth.js', 'js/codec.js', 'js/config.js', 'js/drive.js', 'js/engine.js',
-  'js/icons.js', 'js/local.js', 'js/md5.js', 'js/store.js', 'js/util.js',
+  'js/icons.js', 'js/local.js', 'js/markup.js', 'js/md5.js', 'js/store.js', 'js/util.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
 ];
 

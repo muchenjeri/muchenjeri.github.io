@@ -26,7 +26,8 @@ export function markdown(e, attachments) {
   if (e.deletedAt != null) lines.push(`deleted: ${codec.iso(e.deletedAt)}`);
   if (atts.length) { lines.push('attachments:'); for (const a of atts) lines.push(`  - attachments/${codec.archiveName(a)}`); }
   lines.push('---', '', `# ${heading}`, '');
-  if (e.body.trim()) lines.push(e.body.trimEnd(), '');
+  // The journal treats each line as a paragraph; Markdown needs a blank line between them.
+  if (e.body.trim()) lines.push(e.body.split('\n').filter((l) => l.trim()).map((l) => l.trimEnd()).join('\n\n'), '');
   if (atts.length) {
     lines.push('## Attachments', '');
     for (const a of atts) {

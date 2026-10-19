@@ -8,6 +8,7 @@ import { GoogleAuth } from './auth.js';
 import { md5Blob } from './md5.js';
 import { photoTakenAt, insertPhrase, matchEntry, duration } from './util.js';
 import { exportJournal } from './archive.js';
+import { strip, segments, paragraphs, toggle as toggleFormat } from './markup.js';
 import { ICONS } from './icons.js';
 
 // ---------- tiny DOM helpers ----------
@@ -36,7 +37,7 @@ const startOfDayKey = (key) => { const [y, m, d] = key.split('-').map(Number); r
 let toastTimer;
 function toast(text, action = null, ms = 5000) {
   const t = document.getElementById('toast');
-  t.replaceChildren(h('span', {}, text), action ? h('button', { onclick: () => { t.classList.remove('show'); action.run(); } }, action.label) : null);
+  t.replaceChildren(h('span', {}, text), ...(action ? [h('button', { onclick: () => { t.classList.remove('show'); action.run(); } }, action.label)] : []));
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), ms);
@@ -184,7 +185,7 @@ const fab = (day) => h('button', { class: 'fab', title: 'New entry', 'aria-label
 // ---------- lists ----------
 function entryCard(e, { showDate = false, onclick } = {}) {
   const c = counts(e.id);
-  const preview = e.body.replace(/\s+/g, ' ').trim().slice(0, 400);
+  const preview = strip(e.body).replace(/\s+/g, ' ').trim().slice(0, 400);
   return h('button', { class: 'card', onclick: onclick ?? (() => { location.hash = `#/entry/${e.id}`; }) },
     h('div', { class: 'meta' },
       h('span', {}, showDate ? `${fmtShortDay(e.entryAt)} · ${fmtTime(e.entryAt)}` : fmtTime(e.entryAt)),
@@ -266,7 +267,7 @@ function searchView(v) {
     const q = state.query.trim();
     if (!q) return results.replaceChildren(h('p', { class: 'empty' }, "Searches every entry's title and text. Works offline."));
     const hits = [];
-    for (const e of active()) { const r = matchEntry(e, q); if (r) hits.push([e, r]); }
+    for (const e of active()) { const shown = { ...e, body: strip(e.body) }; const r = matchEntry(shown, q); if (r) hits.push([shown, r]); }
     if (!hits.length) return results.replaceChildren(h('p', { class: 'empty' }, `No entries match “${q}”.`));
     results.replaceChildren(h('div', { class: 'meta' }, `${hits.length} ${hits.length === 1 ? 'entry' : 'entries'}`), ...hits.map(([e, ranges]) => searchCard(e, ranges)));
   }
@@ -685,23 +686,96 @@ async function renderEditor(id, day) {
       bodyEl.value = entry.body;
       grow();
     }
+    readBtn.hidden = reading || !entry;
+    if (reading) renderReading();
   });
 
-  view().replaceChildren(
-    h('div', { class: 'editor-bar' },
-      h('button', { class: 'icon-btn', title: 'Back', 'aria-label': 'Back', onclick: done }, icon('back')),
-      dateBtn,
-      h('button', { class: 'icon-btn done-btn', title: 'Done (Ctrl+Enter)', 'aria-label': 'Done', onclick: done }, icon('check')),
-      menuWrap),
-    banners, titleEl, attsEl, bodyEl,
-    h('div', { class: 'editor-tools' },
-      h('button', { class: 'tool', onclick: () => fileInput.click() }, icon('photo'), 'Photo'),
-      recBtn, dictBtn, fileInput,
-      h('span', { class: 'kbd-hint' }, 'Saved automatically · Ctrl+Enter when done')));
+  // Hidden formatting: Ctrl+B / Ctrl+I wrap the selection in **bold** / *italic*.
+  bodyEl.addEventListener('keydown', (ev) => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+    const marker = { b: '**', i: '*' }[ev.key.toLowerCase()];
+    if (!marker) return;
+    ev.preventDefault();
+    const old = bodyEl.value;
+    const r = toggleFormat(old, bodyEl.selectionStart, bodyEl.selectionEnd, marker);
+    // Replace only the changed region with insertText so Ctrl+Z can undo it.
+    let a = 0;
+    while (a < old.length && a < r.text.length && old[a] === r.text[a]) a++;
+    let b = 0;
+    while (b < old.length - a && b < r.text.length - a && old[old.length - 1 - b] === r.text[r.text.length - 1 - b]) b++;
+    bodyEl.setSelectionRange(a, old.length - b);
+    if (!document.execCommand('insertText', false, r.text.slice(a, r.text.length - b))) {
+      bodyEl.value = r.text;
+      bodyEl.dispatchEvent(new Event('input'));
+    }
+    bodyEl.setSelectionRange(r.selStart, r.selEnd);
+  });
+
+  // Reading mode: the entry laid out like a book page; nothing to type into.
+  let reading = !!existing;
+  const readingHead = h('header', { class: 'reading-head' });
+  const readingBody = h('article', { class: 'reading' });
+  const formatted = (text) => segments(text).map((s) =>
+    s.bold && s.italic ? h('strong', {}, h('em', {}, s.text)) : s.bold ? h('strong', {}, s.text) : s.italic ? h('em', {}, s.text) : s.text);
+  function renderReading() {
+    const at = entry?.entryAt ?? entryAtIfNew ?? Date.now();
+    const status = !entry ? '' : !auth.connected ? 'Saved in this browser only' : isDirty(entry) ? 'Saved · waiting to back up' : entry.remoteRev ? 'Backed up to Google Drive' : 'Saved';
+    readingHead.replaceChildren(...[
+      h('div', { class: 'reading-date' }, `${fmtDay(at)} · ${fmtTime(at)}`),
+      h('div', { class: 'reading-status' }, status),
+      titleEl.value.trim() ? h('h1', { class: 'reading-title' }, titleEl.value) : null].filter(Boolean));
+    const paras = paragraphs(bodyEl.value);
+    readingBody.replaceChildren(...(paras.length ? paras.map((p) => {
+      if (p.sceneBreak) return h('div', { class: 'scene-break', 'aria-hidden': 'true' }, '⁂');
+      if (p.heading) return h(`h${p.heading + 1}`, { class: `reading-h${p.spaceBefore ? ' gap' : ''}` }, ...formatted(p.text));
+      return h('p', { class: [p.indent ? 'indent' : '', p.spaceBefore ? 'gap' : ''].join(' ').trim() || null }, ...formatted(p.text));
+    }) : [h('p', { class: 'empty' }, 'Nothing written yet. Click the pencil to write.')]));
+  }
+
+  const editBtn = h('button', { class: 'icon-btn done-btn', title: 'Edit (E)', 'aria-label': 'Edit', onclick: () => setMode(false) }, icon('edit'));
+  const readBtn = h('button', { class: 'icon-btn', title: 'Reading mode', 'aria-label': 'Reading mode', onclick: () => setMode(true) }, icon('book'));
+  const doneBtn = h('button', { class: 'icon-btn done-btn', title: 'Done (Ctrl+Enter)', 'aria-label': 'Done', onclick: done }, icon('check'));
+  const bar = h('div', { class: 'editor-bar' },
+    h('button', { class: 'icon-btn', title: 'Back', 'aria-label': 'Back', onclick: done }, icon('back')),
+    dateBtn, h('span', { class: 'bar-spacer' }), editBtn, readBtn, doneBtn, menuWrap);
+  const tools = h('div', { class: 'editor-tools' },
+    h('button', { class: 'tool', onclick: () => fileInput.click() }, icon('photo'), 'Photo'),
+    recBtn, dictBtn, fileInput,
+    h('span', { class: 'kbd-hint' }, 'Saved automatically · Ctrl+B bold · Ctrl+I italic · Ctrl+Enter when done'));
+
+  async function setMode(toReading) {
+    if (toReading) {
+      if (recorder) await stopRecording(true);
+      stopDictation();
+      await flush();
+      entry = await journal.entry(id);
+    }
+    reading = toReading;
+    document.body.classList.toggle('reading-mode', reading);
+    dateBtn.hidden = reading;
+    editBtn.hidden = !reading;
+    readBtn.hidden = reading || !entry;
+    doneBtn.hidden = reading;
+    if (reading) {
+      renderReading();
+      view().replaceChildren(bar, banners, readingHead, attsEl, readingBody);
+    } else {
+      view().replaceChildren(bar, banners, titleEl, attsEl, bodyEl, tools);
+      setTimeout(() => { grow(); bodyEl.focus(); bodyEl.setSelectionRange(bodyEl.value.length, bodyEl.value.length); }, 0);
+    }
+  }
+  const onReadKey = (ev) => {
+    if (reading && ev.key.toLowerCase() === 'e' && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !document.querySelector('dialog[open], .lightbox')) {
+      ev.preventDefault();
+      setMode(false);
+    }
+  };
+  document.addEventListener('keydown', onReadKey);
+
   dateBtn.onclick = changeDate;
   updateHeader();
   renderAttachments();
-  setTimeout(() => { grow(); bodyEl.focus(); bodyEl.setSelectionRange(bodyEl.value.length, bodyEl.value.length); }, 0);
+  await setMode(reading);
 
   editorFlush = () => flush();
   leaveView = async () => {
@@ -710,6 +784,8 @@ async function renderEditor(id, day) {
     await flush();
     offChange();
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keydown', onReadKey);
+    document.body.classList.remove('reading-mode');
     urls.forEach((u) => URL.revokeObjectURL(u));
     editorFlush = null;
   };
